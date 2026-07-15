@@ -108,7 +108,7 @@ We're upfront about these, because they're exactly where a research collaboratio
 - **Single-signer framing assumptions** — fixed square resizing, no hand/pose-based cropping.
 - **Benchmarks not yet published** — formal accuracy/latency protocol is in progress.
 
-## 🗺 Roadmap & open research questions
+##  Roadmap & open research questions
 
 - Continuous sign language recognition (sentence-level, not isolated gestures)
 - Incorporating non-manual markers (facial expression, mouth shape) that carry grammatical meaning in RSL
@@ -117,13 +117,13 @@ We're upfront about these, because they're exactly where a research collaboratio
 - On-device / mobile export (quantization, smaller backbone) for lower-latency inference
 - A formal accuracy/latency benchmarking protocol and public leaderboard
 
-## 🤝 Collaborating with us
+##  Collaborating with us
 
 Sigma Sign started as a hackathon project built to make everyday communication more accessible for the deaf and hard-of-hearing community. We're now looking to partner with **researchers and labs working on sign language recognition, continuous gesture translation, or accessibility-focused ML** — anywhere in the world.
 
 If any of the open questions above overlap with your research, we'd love to talk: **kuznetsova4ka@gmail.com**
 
-## 📽 Presentation
+##  Presentation
 
 <a href="assets/Sigma-Sign-Presentation.pdf">
   <img src="assets/banner.png" alt="Open the full Sigma Sign pitch deck (PDF)" width="50%" />
