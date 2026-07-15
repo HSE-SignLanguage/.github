@@ -52,8 +52,6 @@ Two things matter most for this kind of live UX: **translation speed** and **acc
 - **Why not the off-the-shelf Sber ONNX baseline?** We benchmarked it early on and moved to our own fine-tuned S3D checkpoint instead, after comparing inference speed and accuracy on our target vocabulary.
 - **Inference strategy:** a **sliding window** of frames (32 by default) is fed to the model continuously; consecutive duplicate predictions and "no gesture" frames are collapsed into a clean output sequence.
 
-A full benchmarking write-up (accuracy / latency across CPU and GPU) is in progress — see [Roadmap](#-roadmap--open-research-questions).
-
 ## Architecture
 
 ```mermaid
@@ -98,7 +96,7 @@ Each repo has its own detailed README (setup, API reference, configuration) — 
 <img src="assets/deploy.png" alt="Dokploy deployment dashboard showing frontend, ML, and backend services" width="85%" />
 </div>
 
-All three services are containerized and deployed independently via [Dokploy](https://dokploy.com/), a self-hosted PaaS, with per-service logs and rollback. The hackathon demo environment isn't publicly reachable right now — reach out if you'd like a walkthrough.
+All three services are containerized and deployed independently via [Dokploy](https://dokploy.com/), a self-hosted PaaS, with per-service logs and rollback. The site isn't publicly reachable right now — reach out if you'd like a walkthrough.
 
 ## Known limitations
 
