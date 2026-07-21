@@ -1,140 +1,98 @@
 <div align="center">
 
-<img src="assets/banner.png" alt="Sigma Sign — AI web service for Russian Sign Language recognition" width="100%" />
+<img src="assets/banner.png" alt="Sigma Sign — Russian Sign Language recognition in the browser" width="100%" />
 
-### Turning Russian Sign Language into text, in real time
+### Russian Sign Language gesture recognition from a webcam or video
 
-[![Python](https://img.shields.io/badge/ML%20service-Python%20%2F%20FastAPI-3776AB?logo=python&logoColor=white)](https://github.com/HSE-SignLanguage/ml)
-[![Go](https://img.shields.io/badge/backend-Go-00ADD8?logo=go&logoColor=white)](https://github.com/HSE-SignLanguage/backend)
-[![Vue](https://img.shields.io/badge/frontend-Vue-4FC08D?logo=vuedotjs&logoColor=white)](https://github.com/HSE-SignLanguage/frontend)
-[![ONNX Runtime](https://img.shields.io/badge/inference-ONNX%20Runtime-black?logo=onnx&logoColor=white)](https://github.com/HSE-SignLanguage/ml)
-[![Status](https://img.shields.io/badge/status-beta-yellow)]()
-[![License](https://img.shields.io/badge/license-TBD-lightgrey)]()
+[![ML](https://img.shields.io/badge/ML-Python%20%2F%20FastAPI-3776AB?logo=python&logoColor=white)](https://github.com/HSE-SignLanguage/ml)
+[![Backend](https://img.shields.io/badge/backend-Go-00ADD8?logo=go&logoColor=white)](https://github.com/HSE-SignLanguage/backend)
+[![Frontend](https://img.shields.io/badge/frontend-Vue-4FC08D?logo=vuedotjs&logoColor=white)](https://github.com/HSE-SignLanguage/frontend)
+[![Inference](https://img.shields.io/badge/inference-ONNX%20Runtime-black?logo=onnx&logoColor=white)](https://github.com/HSE-SignLanguage/ml)
+![Status](https://img.shields.io/badge/status-beta-yellow)
+![License](https://img.shields.io/badge/license-TBD-lightgrey)
 
 **🇬🇧 English** · [🇷🇺 Русский](README.ru.md)
 
+**[Live demo](https://hack.eferzo.xyz/)** · **[Swagger UI](https://hack.eferzo.xyz/swagger/index.html)**
+
 </div>
 
 ---
 
-## About Sigma Sign
+## What Sigma Sign is
 
-**Sigma Sign** is a web application that recognizes **Russian Sign Language (RSL)** from a live webcam feed or an uploaded video and turns it into text — built to make everyday communication more accessible for the deaf and hard-of-hearing community.
+**Sigma Sign** is an experimental web application that recognizes isolated **Russian Sign Language (RSL)** gestures from a live camera or an uploaded video and builds a text transcript. It runs in a browser and does not require dedicated capture hardware.
 
-It started as a **48-hour hackathon project at HSE University** (December 2025) and has since grown into an ongoing research effort. We're now looking to partner with academics and labs working on sign language recognition, continuous gesture translation, or accessibility-focused ML — see [Collaborating with us](#-collaborating-with-us) below.
+The project started at a 48-hour HSE University hackathon in December 2025. It is now a beta research prototype, not a continuous sign-language translator or a replacement for a human interpreter.
 
-## The problem
-
-Sign language is a full, grammatically independent language — but very few hearing people understand it, which creates a real, everyday communication barrier for signers. Sigma Sign's goal is to lower that barrier with a browser-based tool that needs no special hardware: just a camera and a browser tab.
-
-## How it works
-
-<div align="center">
-<img src="assets/happy-path.png" alt="Happy-path user flow: visit site, grant camera access, click Start, sign, get text back" width="85%" />
-</div>
-
-1. User opens the site
-2. Grants camera access (or uploads a video instead)
-3. Presses **Start**
-4. Signs in RSL / uploads a clip
-5. Gets the recognized text back
-
-## Under the hood: the model
-
-<div align="center">
-<img src="assets/model-decision.png" alt="Model decision: sliding window inference, S3D fine-tuned on Slovo instead of the Sber ONNX baseline" width="85%" />
-</div>
-
-Two things matter most for this kind of live UX: **translation speed** and **accuracy**. That drove the core modeling decisions:
-
-- **Architecture:** S3D (Separable 3D CNN), exported to ONNX for fast CPU/GPU inference.
-- **Pretraining → fine-tuning:** pretrained on **Kinetics-400** (general action recognition), then fine-tuned on **[Slovo](https://github.com/hukenovs/slovo)** — an open RSL dataset covering **~1,600 gesture classes**.
-- **Why not the off-the-shelf Sber ONNX baseline?** We benchmarked it early on and moved to our own fine-tuned S3D checkpoint instead, after comparing inference speed and accuracy on our target vocabulary.
-- **Inference strategy:** a **sliding window** of frames (32 by default) is fed to the model continuously; consecutive duplicate predictions and "no gesture" frames are collapsed into a clean output sequence.
-
-## Architecture
+## System and request flow
 
 ```mermaid
 flowchart LR
-    U([User]) -->|webcam / video upload| FE[Frontend<br/>Vue]
-    FE -->|frames| BE[Backend<br/>Go]
-    BE -->|"POST /process (32-frame batches)"| ML[ML Service<br/>Python / FastAPI]
-    ML -->|downloads model on startup| S3[(S3-compatible storage<br/>Cloudflare R2)]
-    ML -->|"{ text: gesture }"| BE
-    BE -->|optional polish| OR[OpenRouter<br/>LLM transcript cleanup]
-    BE --> FE
-    FE --> U
+    U([User]) -->|camera or video| FE[frontend<br/>Vue]
+    FE -->|"live: WSS /api/socket<br/>upload: POST /api/upload"| BE[backend<br/>Go]
+    BE -->|"32-frame windows<br/>POST /process"| ML[ml<br/>FastAPI + ONNX Runtime]
+    ML -->|"accepted · text · confidence"| BE
+    ML -.->|artifacts at startup| S3[(S3-compatible storage)]
+    BE -.->|optional conservative cleanup| OR[OpenRouter]
+    BE -->|transcript or job status| FE
 ```
 
-<div align="center">
-<img src="assets/architecture.png" alt="Backend architecture diagram from the hackathon pitch: Frontend, Backend, ML service, Swagger API" width="85%" />
-</div>
+For live recognition, the frontend sends JPEG frames over one WebSocket. The backend builds overlapping 32-frame windows with a stride of 16 and sends them to the internal ML API. For an uploaded video, the backend validates it with `ffprobe`, extracts bounded frame windows with FFmpeg, and exposes progress through `/job/{id}`.
 
-The Go backend streams webcam frames over WebSocket (batched into groups of 32) or extracts frames from an uploaded video with FFmpeg, forwards each batch to the ML service, and optionally polishes the raw literal output into natural, grammatical text via an LLM — while keeping rolling context across batches for coherence.
-
-## See it in action
-
-<div align="center">
-<img src="assets/examples.png" alt="Example recognized phrases: 'рад с вами познакомиться' and 'мне здесь очень понравилось'" width="85%" />
-</div>
-
-*("Nice to meet you" and "I really liked it here" — recognized from RSL video input.)*
+The ML service returns a label, confidence and acceptance decision. In the live path, the backend confirms a gesture across two matching accepted windows before emitting it. OpenRouter can conservatively adjust grammar and punctuation; it is outside the recognition decision and can be disabled.
 
 ## Repositories
 
-| Repo | Stack | Role |
+| Repository | Stack | Responsibility |
 | --- | --- | --- |
-| [`frontend`](https://github.com/HSE-SignLanguage/frontend) | Vue | Captures webcam frames / video upload, displays the translated text |
-| [`backend`](https://github.com/HSE-SignLanguage/backend) | Go | WebSocket streaming, video upload jobs, orchestration, optional LLM transcript polishing, Swagger docs |
-| [`ml`](https://github.com/HSE-SignLanguage/ml) | Python / FastAPI | Runs S3D/ONNX inference, returns recognized gestures |
+| [`frontend`](https://github.com/HSE-SignLanguage/frontend) | Vue 3 + Vite | Camera capture, video upload, WebSocket lifecycle, job polling and transcript UI |
+| [`backend`](https://github.com/HSE-SignLanguage/backend) | Go + Chi | Public API, frame windows, recognition stabilization, upload jobs and optional transcript cleanup |
+| [`ml`](https://github.com/HSE-SignLanguage/ml) | Python + FastAPI + ONNX Runtime | Model artifact loading, frame validation and isolated-gesture inference |
 
-Each repo has its own detailed README (setup, API reference, configuration) — start there for anything implementation-specific.
+Each service is independently containerized. Configuration and development commands live with the service they affect; begin with the README in [`backend`](https://github.com/HSE-SignLanguage/backend) or [`ml`](https://github.com/HSE-SignLanguage/ml), and the scripts in [`frontend/package.json`](https://github.com/HSE-SignLanguage/frontend/blob/main/package.json).
 
-## Deployment
+## Recognition and reliability guardrails
 
-<div align="center">
-<img src="assets/deploy.png" alt="Dokploy deployment dashboard showing frontend, ML, and backend services" width="85%" />
-</div>
+- **Reject uncertainty:** the ML service rejects `no gesture`, low-confidence and low-margin windows instead of returning every top-1 prediction. Live recognition requires two matching accepted predictions and waits for neutral/rejected windows before allowing the same gesture again.
+- **Bounded live path:** stale frame work is replaced rather than accumulated. WebSockets have frame, rate, byte, idle, global and per-client limits; ML calls and transcript cleanup use separate bounded queues.
+- **Bounded uploads:** files are probed before a job is accepted and limited by size, duration, resolution and extracted-frame count. Upload and processing concurrency are capped.
+- **Fail safely:** transient ML overload is retried with bounded jitter. OpenRouter output must satisfy a strict append-only schema within a five-second timeout; invalid or unavailable AI output falls back to the literal recognized gesture.
+- **Hardened containers:** current images run as non-root users and expose health checks. Backend and ML compose definitions add resource limits; model artifacts can be pinned with SHA-256 checksums.
 
-All three services are containerized and deployed independently via [Dokploy](https://dokploy.com/), a self-hosted PaaS, with per-service logs and rollback. The site isn't publicly reachable right now — reach out if you'd like a walkthrough.
+## Deployment notes
+
+The public deployment uses one origin: the frontend is served at `/`, while `/api` is routed to the backend with WebSocket upgrades and the prefix stripped. The backend reaches the ML API through internal service DNS; only the ML service needs access to S3-compatible object storage.
+
+When deploying the stack:
+
+- point `ML_API_URL` at stable internal service DNS, not `localhost` from another container;
+- configure `TRUSTED_PROXY_CIDRS` with only the actual ingress network so per-client limits cannot be bypassed with forwarded headers;
+- keep S3-compatible storage and OpenRouter credentials in deployment secrets, never in Git;
+- use `USE_MOCK=true` and `USE_OPENROUTER=false` for UI/backend development without model artifacts or an external LLM.
+
+There is intentionally no organization-level compose file: each repository owns its own build, tests and runtime configuration.
 
 ## Known limitations
 
-We're upfront about these, because they're exactly where a research collaboration could help most:
+- The model classifies **isolated gestures per window**; it does not model continuous RSL grammar, co-articulation or non-manual markers such as facial expression and mouth shape.
+- The vocabulary is closed at roughly 1,600 labels derived from [Slovo](https://github.com/hukenovs/slovo); names, new words and regional variants can be out of distribution.
+- Fixed square resizing without hand/pose tracking makes recognition sensitive to framing, lighting, background and signer variation.
+- Stabilization reduces transition noise but adds latency and may suppress an intentional repeated gesture until neutral frames are observed.
+- Accuracy and latency benchmarks are not yet published. The live instance has deliberately small capacity limits and may return `503` while busy.
+- Upload jobs and live sessions are process-local; a backend restart interrupts active work and does not preserve job state.
+- Optional LLM cleanup improves presentation only. It cannot recover a gesture the model recognized incorrectly.
 
-- **Isolated gestures, not continuous signing** — no grammar, non-manual markers (facial expression, mouth patterns), or co-articulation modeling yet.
-- **Fixed, closed vocabulary** — ~1,600 classes from Slovo; names, neologisms, and regional variants fall outside it.
-- **No cross-window confidence calibration** — overlapping windows fire independently, with only simple de-duplication.
-- **Single-signer framing assumptions** — fixed square resizing, no hand/pose-based cropping.
-- **Benchmarks not yet published** — formal accuracy/latency protocol is in progress.
+## Research and collaboration
 
-##  Roadmap & open research questions
+Open directions include continuous recognition, non-manual features, broader data, temporal calibration and reproducible evaluation. Researchers working on sign-language recognition or accessible ML are welcome to contact **kuznetsova4ka@gmail.com**.
 
-- Continuous sign language recognition (sentence-level, not isolated gestures)
-- Incorporating non-manual markers (facial expression, mouth shape) that carry grammatical meaning in RSL
-- Expanding vocabulary beyond Slovo's ~1,600 classes with additional data collection
-- Temporal smoothing / voting across overlapping windows
-- On-device / mobile export (quantization, smaller backbone) for lower-latency inference
-- A formal accuracy/latency benchmarking protocol and public leaderboard
-
-##  Collaborating with us
-
-Sigma Sign started as a hackathon project built to make everyday communication more accessible for the deaf and hard-of-hearing community. We're now looking to partner with **researchers and labs working on sign language recognition, continuous gesture translation, or accessibility-focused ML** — anywhere in the world.
-
-If any of the open questions above overlap with your research, we'd love to talk: **kuznetsova4ka@gmail.com**
-
-##  Presentation
-
-<a href="assets/Sigma-Sign-Presentation.pdf">
-  <img src="assets/banner.png" alt="Open the full Sigma Sign pitch deck (PDF)" width="50%" />
-</a>
-
-**[Download the full hackathon pitch deck (PDF)](assets/Sigma-Sign-Presentation.pdf)** — problem statement, model comparison, architecture, and deployment walkthrough.
+The original hackathon context is preserved in the **[Sigma Sign presentation](assets/Sigma-Sign-Presentation.pdf)**.
 
 ---
 
 <div align="center">
 
-Built by students of HSE University during a 48-hour hackathon · December 2025
+Built by HSE University students during a 48-hour hackathon · December 2025
 
 </div>
