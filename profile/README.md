@@ -54,7 +54,7 @@ Each service is independently containerized. Configuration and development comma
 
 ## Recognition and reliability guardrails
 
-- **Reject uncertainty:** the ML service rejects `no gesture`, low-confidence and low-margin windows instead of returning every top-1 prediction. Live recognition requires two matching accepted predictions and waits for neutral/rejected windows before allowing the same gesture again.
+- **Reject uncertainty:** the ML service rejects `no gesture`, low-confidence and low-margin windows instead of returning every top-1 prediction. The first accepted gesture is emitted immediately; a held gesture stays suppressed until two neutral/rejected windows, while a direct change to another class needs confirmation.
 - **Bounded live path:** stale frame work is replaced rather than accumulated. WebSockets have frame, rate, byte, idle, global and per-client limits; ML calls and transcript cleanup use separate bounded queues.
 - **Bounded uploads:** files are probed before a job is accepted and limited by size, duration, resolution and extracted-frame count. Upload and processing concurrency are capped.
 - **Fail safely:** transient ML overload is retried with bounded jitter. OpenRouter output must satisfy a strict append-only schema within a five-second timeout; invalid or unavailable AI output falls back to the literal recognized gesture.
@@ -76,10 +76,10 @@ There is intentionally no organization-level compose file: each repository owns 
 ## Known limitations
 
 - The model classifies **isolated gestures per window**; it does not model continuous RSL grammar, co-articulation or non-manual markers such as facial expression and mouth shape.
-- The vocabulary is closed at roughly 1,600 labels derived from [Slovo](https://github.com/hukenovs/slovo); names, new words and regional variants can be out of distribution.
+- Production uses the 1,599-output S3D model and label mapping from [Easy Sign](https://github.com/ai-forever/easy_sign), whose training data includes part of [Slovo](https://github.com/hukenovs/slovo); Slovo alone does not define the full vocabulary, and names, new words and regional variants can be out of distribution.
 - Fixed square resizing without hand/pose tracking makes recognition sensitive to framing, lighting, background and signer variation.
 - Stabilization reduces transition noise but adds latency and may suppress an intentional repeated gesture until neutral frames are observed.
-- Accuracy and latency benchmarks are not yet published. The live instance has deliberately small capacity limits and may return `503` while busy.
+- The ML repository publishes a pinned 20-video regression sentinel, not a representative accuracy or latency benchmark. The live instance has deliberately small capacity limits and may return `503` while busy.
 - Upload jobs and live sessions are process-local; a backend restart interrupts active work and does not preserve job state.
 - Optional LLM cleanup improves presentation only. It cannot recover a gesture the model recognized incorrectly.
 
